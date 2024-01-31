@@ -1,0 +1,32 @@
+[   
+    {
+        "name":"banyu",
+        "email": "hello@gmail.com",
+        "password": "tes123",
+        "role": "customer"
+    },
+    {
+        "name":"udin",
+        "email": "udin@gmail.com",
+        "password": "tes123",
+        "role": "merchant"
+    },
+    {
+        "name":"jaya",
+        "email": "jaya@gmail.com",
+        "password": "tes123",
+        "role": "merchant"
+    },
+    {
+        "name":"budi",
+        "email": "budi@gmail.com",
+        "password": "tes123",
+        "role": "merchant"
+    },
+    {
+        "name":"cahyo",
+        "email": "cahyo@gmail.com",
+        "password": "tes123",
+        "role": "customer"
+    }
+]

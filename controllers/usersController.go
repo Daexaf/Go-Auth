@@ -13,11 +13,11 @@ import (
 )
 
 func Signup(c *gin.Context) {
-	//get email / password req body
 	var body struct {
 		Name     string
 		Email    string
 		Password string
+		Role     string
 	}
 
 	if c.Bind(&body) != nil {
@@ -28,7 +28,6 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	//hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 10)
 
 	if err != nil {
@@ -39,9 +38,7 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	//create the user
-	user := models.User{Name: body.Name, Email: body.Email, Password: string(hash)}
-
+	user := models.User{Name: body.Name, Email: body.Email, Password: string(hash), Role: body.Role}
 	result := initializers.DB.Create(&user)
 
 	if result.Error != nil {
@@ -51,12 +48,15 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	//respond
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User created successfully",
+		"user_id": user.ID,
+		"name":    user.Name,
+		"role":    user.Role,
+	})
 }
 
 func Login(c *gin.Context) {
-	//get email and pass from req body
 	var body struct {
 		Email    string
 		Password string
@@ -70,7 +70,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	//look up req user
 	var user models.User
 	initializers.DB.First(&user, "email = ?", body.Email)
 
@@ -82,7 +81,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	//compare sent in pass with saved user pass hash
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password))
 
 	if err != nil {
@@ -92,6 +90,7 @@ func Login(c *gin.Context) {
 
 		return
 	}
+
 	//generate a jwt token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
@@ -109,16 +108,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	//respond with token
-	// c.JSON(http.StatusOK, gin.H{
-	// 	"token": tokenString,
-	// })
-
-	//send it back
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("Authorization", tokenString, 3600*24*30, "", "", false, true)
 
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Login successfully",
+		"user_id": user.ID,
+		"name":    user.Name,
+		"role":    user.Role,
+	})
 }
 
 func Validate(c *gin.Context) {
@@ -129,9 +127,8 @@ func Validate(c *gin.Context) {
 }
 
 func Logout(c *gin.Context) {
-	// Clear the JWT cookie on the client side
 	c.SetCookie("Authorization", "", -1, "", "", false, true)
 
-	// Respond with a successful logout message
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
+
 }

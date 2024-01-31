@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,43 +14,65 @@ import (
 )
 
 func RequireAuth(c *gin.Context) {
-	fmt.Println("im middleware requires")
-
-	//get cookie from request
 	tokenString, err := c.Cookie("Authorization")
 
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
+		return
 	}
 
-	//decode/validate it
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
-
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		return []byte(os.Getenv("SECRET")), nil
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		//check the exp
 		if float64(time.Now().Unix()) > claims["exp"].(float64) {
 			c.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
-		//find the user with token sub
 		var user models.User
 		initializers.DB.First(&user, claims["sub"])
 
 		if user.ID == 0 {
 			c.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
-		//attach to req
 		c.Set("user", user)
-		//continue
 		c.Next()
-	} else {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		return
 	}
 
+	c.AbortWithStatus(http.StatusUnauthorized)
+}
+
+func RequireAuthForTransaction(c *gin.Context) {
+	RequireAuth(c)
+
+	user := c.MustGet("user").(models.User)
+
+	var transactionData models.Transaction
+	if err := c.ShouldBindJSON(&transactionData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		c.Abort()
+		return
+	}
+
+	// Check if the sender is authenticated
+	if strconv.Itoa(int(user.ID)) != transactionData.SenderAccountID {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Sender does not match authenticated user"})
+		return
+	}
+
+	// Check if the receiver is authenticated
+	var receiver models.User
+	initializers.DB.First(&receiver, transactionData.ReceiveAccountID)
+	if receiver.ID == 0 {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Receiver not found"})
+		return
+	}
+
+	c.Next()
 }
